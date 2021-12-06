@@ -1,0 +1,61 @@
+clear all; 
+close all;
+N_hmg = 6;
+A = [0 1 0 0 0 0
+     1 0 1 1 1 1
+     0 1 0 1 1 1
+     0 1 1 0 1 1
+     0 1 1 1 0 1
+     0 1 1 1 1 0];
+ 
+ %A = ones(N_hmg)-eye(N_hmg);
+ %L = diag(A*ones(N_hmg,1)) - A;
+a_Gen = -[0.025,0.095,0.05,0.04,0.065,0.05];
+b_Gen = [3,-6,-13,3,-23,3];
+v = zeros(N_hmg,1);
+b = zeros(N_hmg,1);
+b(N_hmg) = 600;
+
+%% ESC algorithm
+% Extremum Seeking Control Parameters
+freq = 10; % sample frequency
+dt = 1/freq;
+T = 20; % total period of simulation (in seconds)
+Amp = 0.5;  % amplitude
+omega = 1.5*pi; % 10 Hz
+phase = 0;
+K = 5;   % integration gain
+% High pass filter (Butterworth filter)
+butterfreq= pi;  % in Hz for 'high'
+lambdacons = ones(N_hmg,1);
+%lambdacons = [3;8;4;-1;5;6];
+xxx = 100*ones(N_hmg,1);
+%x(3)=1;
+xhats=xxx;
+offer = xxx;
+xhat = xxx;
+%dt=.53;
+rho=0.02;
+Ksi = zeros(N_hmg,1);
+Hist_Ksi = Ksi;
+tic
+for i=1:95*T/dt
+    t = (i-1)*dt;
+    util(:,i) = JCalculator(offer);
+    for j=1:N_hmg
+        yvals(j,i) = a_Gen(j)*xhats(j,i)^2 + b_Gen(j)*xhats(j,i);
+        v(j,i+1) = v(j,i) + dt*(A(j,:)*(lambdacons(j,i)*ones(N_hmg,1)-lambdacons(:,i)));
+        lambdacons(j,i+1) = lambdacons(j,i) + dt*((xhats(j,i) - b(j)) - (A(j,:)*(lambdacons(j,i)*ones(N_hmg,1)-lambdacons(:,i))) - v(j,i));                
+    end
+    Ksi = (1-dt*butterfreq)*Ksi+(JCalculator(xhat + Amp*sin(omega*(t)))-JCalculator(xhat + Amp*sin(omega*(t-dt))))/1;
+    khi = Amp*Ksi.*sin(omega*t + phase);
+    xhat = xhat + 1*(khi-lambdacons(:,i)-rho*(sum(xhat) - sum(b)))*K*dt;
+    xxx = xhat + 0.2*Amp*sin(omega*t + phase);
+    xhats(:,i+1) = xhat;
+    xvals(:,i+1) = xxx;
+    lambda = 0.02*(sum(xhat) - sum(b));
+    lambdaVals(i) = lambda;
+    offer =xxx;
+    Hist_Ksi(:,i+1) = Ksi;
+end
+toc
